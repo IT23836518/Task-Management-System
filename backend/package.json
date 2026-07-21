@@ -4,7 +4,7 @@
   "description": "Backend API for Task Management System Assessment",
   "main": "dist/index.js",
   "scripts": {
-    "build": "tsc",
+    "build": "prisma generate && tsc",
     "start": "node dist/index.js",
     "dev": "nodemon --watch src -e ts --exec ts-node src/index.ts"
   },
