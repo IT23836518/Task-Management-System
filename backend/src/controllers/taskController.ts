@@ -72,7 +72,7 @@ export const createTask = async (req: Request, res: Response, next: NextFunction
   }
 };
 
-// 2. Get All Tasks (Basic, before advanced filter/sort in Step 5)
+// 2. Get All Tasks (with search, filter, and sort in Step 5)
 export const getTasks = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const userId = req.user?.userId;
@@ -82,9 +82,44 @@ export const getTasks = async (req: Request, res: Response, next: NextFunction) 
       throw error;
     }
 
+    const { search, status, priority, sortBy } = req.query;
+
+    // Build query filters
+    const where: any = {
+      userId
+    };
+
+    // 1. Search by title (case-insensitive)
+    if (search && typeof search === 'string') {
+      where.title = {
+        contains: search,
+        mode: 'insensitive'
+      };
+    }
+
+    // 2. Filter by status
+    if (status && typeof status === 'string') {
+      where.status = status;
+    }
+
+    // 3. Filter by priority
+    if (priority && typeof priority === 'string') {
+      where.priority = priority;
+    }
+
+    // 4. Sort
+    let orderBy: any = { createdAt: 'desc' }; // default: newest first
+    if (sortBy && typeof sortBy === 'string') {
+      if (sortBy === 'oldest') {
+        orderBy = { createdAt: 'asc' };
+      } else if (sortBy === 'dueDate') {
+        orderBy = { dueDate: 'asc' };
+      }
+    }
+
     const tasks = await prisma.task.findMany({
-      where: { userId },
-      orderBy: { createdAt: 'desc' }
+      where,
+      orderBy
     });
 
     res.json({
@@ -95,6 +130,7 @@ export const getTasks = async (req: Request, res: Response, next: NextFunction) 
     next(err);
   }
 };
+
 
 // 3. Get Task by ID
 export const getTaskById = async (req: Request, res: Response, next: NextFunction) => {
@@ -243,6 +279,47 @@ export const deleteTask = async (req: Request, res: Response, next: NextFunction
     res.json({
       success: true,
       message: 'Task deleted successfully'
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// 6. Get Task Metrics (Dashboard stats)
+export const getTaskMetrics = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) {
+      const error: CustomError = new Error('User context missing');
+      error.statusCode = 401;
+      throw error;
+    }
+
+    const today = new Date();
+
+    const [totalTasks, pendingTasks, inProgressTasks, completedTasks, overdueTasks] = await Promise.all([
+      prisma.task.count({ where: { userId } }),
+      prisma.task.count({ where: { userId, status: 'PENDING' } }),
+      prisma.task.count({ where: { userId, status: 'IN_PROGRESS' } }),
+      prisma.task.count({ where: { userId, status: 'COMPLETED' } }),
+      prisma.task.count({
+        where: {
+          userId,
+          status: { not: 'COMPLETED' },
+          dueDate: { lt: today }
+        }
+      })
+    ]);
+
+    res.json({
+      success: true,
+      data: {
+        totalTasks,
+        pendingTasks,
+        inProgressTasks,
+        completedTasks,
+        overdueTasks
+      }
     });
   } catch (err) {
     next(err);

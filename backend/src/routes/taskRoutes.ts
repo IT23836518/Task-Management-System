@@ -4,7 +4,8 @@ import {
   getTasks,
   getTaskById,
   updateTask,
-  deleteTask
+  deleteTask,
+  getTaskMetrics
 } from '../controllers/taskController';
 import { protect } from '../middlewares/auth';
 
@@ -15,8 +16,10 @@ router.use(protect);
 
 router.post('/', createTask);
 router.get('/', getTasks);
+router.get('/metrics', getTaskMetrics);
 router.get('/:id', getTaskById);
 router.put('/:id', updateTask);
 router.delete('/:id', deleteTask);
+
 
 export default router;
