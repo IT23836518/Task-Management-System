@@ -62,6 +62,7 @@ body {
   filter: blur(100px);
   z-index: 0;
   opacity: 0.15;
+  pointer-events: none;
 }
 
 .blob-1 {
