@@ -5,8 +5,14 @@ import { DashboardStats } from './components/DashboardStats';
 import { TaskCard, type Task } from './components/TaskCard';
 import { TaskModal } from './components/TaskModal';
 import API from './services/api';
-import { Plus, Search, LogOut, CheckSquare } from 'lucide-react';
+import { Plus, Search, LogOut, CheckSquare, X, CheckCircle, AlertCircle, Info } from 'lucide-react';
 import './App.css';
+
+interface Toast {
+  id: string;
+  message: string;
+  type: 'success' | 'error' | 'info';
+}
 
 const AppContent: React.FC = () => {
   const { user, loading, logout } = useAuth();
@@ -36,21 +42,38 @@ const AppContent: React.FC = () => {
   const [loadingData, setLoadingData] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Toast Notifications State
+  const [toasts, setToasts] = useState<Toast[]>([]);
+
+  // Show a toast message
+  const showToast = (message: string, type: 'success' | 'error' | 'info' = 'success') => {
+    const id = Math.random().toString(36).substring(2, 9);
+    setToasts((prev) => [...prev, { id, message, type }]);
+    
+    // Auto remove after 3.5 seconds
+    setTimeout(() => {
+      removeToast(id);
+    }, 3500);
+  };
+
+  const removeToast = (id: string) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  };
+
   // 1. Debounce Search Input
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedSearch(searchTerm);
-    }, 400); // 400ms debounce
+    }, 400);
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
   // 2. Fetch Tasks and Metrics
-  const fetchTasksAndMetrics = async () => {
+  const fetchTasksAndMetrics = async (silent = false) => {
     if (!user) return;
-    setLoadingData(true);
+    if (!silent) setLoadingData(true);
     setError(null);
     try {
-      // Build query params
       const params: any = {};
       if (debouncedSearch.trim()) params.search = debouncedSearch.trim();
       if (statusFilter) params.status = statusFilter;
@@ -67,8 +90,9 @@ const AppContent: React.FC = () => {
     } catch (err: any) {
       console.error(err);
       setError(err.response?.data?.message || 'Failed to retrieve workspace data.');
+      showToast('Failed to load workspace tasks.', 'error');
     } finally {
-      setLoadingData(false);
+      if (!silent) setLoadingData(false);
     }
   };
 
@@ -80,10 +104,11 @@ const AppContent: React.FC = () => {
   const handleStatusChange = async (id: string, newStatus: Task['status']) => {
     try {
       await API.put(`/tasks/${id}`, { status: newStatus });
-      // Refresh tasks and metrics
-      fetchTasksAndMetrics();
+      showToast(`Task status updated to ${newStatus.replace('_', ' ')}.`, 'success');
+      // Silent refresh so the UI doesn't flash with loaders
+      fetchTasksAndMetrics(true);
     } catch (err: any) {
-      alert(err.response?.data?.message || 'Failed to update task status.');
+      showToast(err.response?.data?.message || 'Failed to update task status.', 'error');
     }
   };
 
@@ -92,9 +117,10 @@ const AppContent: React.FC = () => {
     if (!window.confirm('Are you sure you want to delete this task?')) return;
     try {
       await API.delete(`/tasks/${id}`);
-      fetchTasksAndMetrics();
+      showToast('Task deleted successfully.', 'success');
+      fetchTasksAndMetrics(true);
     } catch (err: any) {
-      alert(err.response?.data?.message || 'Failed to delete task.');
+      showToast(err.response?.data?.message || 'Failed to delete task.', 'error');
     }
   };
 
@@ -120,13 +146,13 @@ const AppContent: React.FC = () => {
   }) => {
     try {
       if (taskToEdit) {
-        // Edit flow
         await API.put(`/tasks/${taskToEdit.id}`, taskData);
+        showToast('Task updated successfully.', 'success');
       } else {
-        // Create flow
         await API.post('/tasks', taskData);
+        showToast('New task added successfully.', 'success');
       }
-      fetchTasksAndMetrics();
+      fetchTasksAndMetrics(true);
     } catch (err: any) {
       throw err.response?.data?.message || 'Action failed. Please try again.';
     }
@@ -280,6 +306,23 @@ const AppContent: React.FC = () => {
         onSubmit={handleModalSubmit}
         taskToEdit={taskToEdit}
       />
+
+      {/* Toast Notifications Overlay Container */}
+      <div className="toast-container">
+        {toasts.map((toast) => (
+          <div key={toast.id} className={`toast toast-${toast.type}`}>
+            <div className="toast-content-wrapper">
+              {toast.type === 'success' && <CheckCircle size={16} className="toast-icon" />}
+              {toast.type === 'error' && <AlertCircle size={16} className="toast-icon" />}
+              {toast.type === 'info' && <Info size={16} className="toast-icon" />}
+              <span className="toast-message">{toast.message}</span>
+            </div>
+            <button onClick={() => removeToast(toast.id)} className="toast-close-btn">
+              <X size={14} />
+            </button>
+          </div>
+        ))}
+      </div>
     </div>
   );
 };
