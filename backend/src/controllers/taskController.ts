@@ -82,7 +82,7 @@ export const getTasks = async (req: Request, res: Response, next: NextFunction) 
       throw error;
     }
 
-    const { search, status, priority, sortBy } = req.query;
+    const { search, status, priority, sortBy, page, limit } = req.query;
 
     // Build query filters
     const where: any = {
@@ -117,14 +117,35 @@ export const getTasks = async (req: Request, res: Response, next: NextFunction) 
       }
     }
 
-    const tasks = await prisma.task.findMany({
-      where,
-      orderBy
-    });
+    // 5. Pagination calculation
+    const pageNum = parseInt(page as string) || 1;
+    const limitNum = parseInt(limit as string) || 6;
+    const skip = (pageNum - 1) * limitNum;
+
+    // Fetch total count matching filters and paginated list concurrently
+    const [totalTasks, tasks] = await Promise.all([
+      prisma.task.count({ where }),
+      prisma.task.findMany({
+        where,
+        orderBy,
+        skip,
+        take: limitNum
+      })
+    ]);
+
+    const totalPages = Math.ceil(totalTasks / limitNum);
 
     res.json({
       success: true,
-      data: tasks
+      data: {
+        tasks,
+        pagination: {
+          totalTasks,
+          totalPages,
+          currentPage: pageNum,
+          limit: limitNum
+        }
+      }
     });
   } catch (err) {
     next(err);

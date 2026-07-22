@@ -34,6 +34,11 @@ const AppContent: React.FC = () => {
   const [priorityFilter, setPriorityFilter] = useState('');
   const [sortBy, setSortBy] = useState('newest');
 
+  // Pagination States
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalTasks, setTotalTasks] = useState(0);
+
   // Modal States
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [taskToEdit, setTaskToEdit] = useState<Task | null>(null);
@@ -68,13 +73,21 @@ const AppContent: React.FC = () => {
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
+  // Reset page to 1 when search or filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [debouncedSearch, statusFilter, priorityFilter, sortBy]);
+
   // 2. Fetch Tasks and Metrics
   const fetchTasksAndMetrics = async (silent = false) => {
     if (!user) return;
     if (!silent) setLoadingData(true);
     setError(null);
     try {
-      const params: any = {};
+      const params: any = {
+        page: currentPage,
+        limit: 6
+      };
       if (debouncedSearch.trim()) params.search = debouncedSearch.trim();
       if (statusFilter) params.status = statusFilter;
       if (priorityFilter) params.priority = priorityFilter;
@@ -85,7 +98,9 @@ const AppContent: React.FC = () => {
         API.get('/tasks/metrics')
       ]);
 
-      setTasks(tasksRes.data.data);
+      setTasks(tasksRes.data.data.tasks);
+      setTotalPages(tasksRes.data.data.pagination.totalPages);
+      setTotalTasks(tasksRes.data.data.pagination.totalTasks);
       setMetrics(metricsRes.data.data);
     } catch (err: any) {
       console.error(err);
@@ -98,7 +113,7 @@ const AppContent: React.FC = () => {
 
   useEffect(() => {
     fetchTasksAndMetrics();
-  }, [user, debouncedSearch, statusFilter, priorityFilter, sortBy]);
+  }, [user, debouncedSearch, statusFilter, priorityFilter, sortBy, currentPage]);
 
   // 3. Quick Status Toggle from Task Card
   const handleStatusChange = async (id: string, newStatus: Task['status']) => {
@@ -286,17 +301,42 @@ const AppContent: React.FC = () => {
           </p>
         </div>
       ) : (
-        <div className="tasks-grid">
-          {tasks.map((task) => (
-            <TaskCard
-              key={task.id}
-              task={task}
-              onEdit={handleOpenEditModal}
-              onDelete={handleDeleteTask}
-              onStatusChange={handleStatusChange}
-            />
-          ))}
-        </div>
+        <>
+          <div className="tasks-grid">
+            {tasks.map((task) => (
+              <TaskCard
+                key={task.id}
+                task={task}
+                onEdit={handleOpenEditModal}
+                onDelete={handleDeleteTask}
+                onStatusChange={handleStatusChange}
+              />
+            ))}
+          </div>
+
+          {/* Pagination Controls */}
+          {totalPages > 1 && (
+            <div className="pagination-container">
+              <button
+                onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+                disabled={currentPage === 1}
+                className="pagination-btn"
+              >
+                Previous
+              </button>
+              <span className="pagination-info">
+                Page {currentPage} of {totalPages} (Total {totalTasks} tasks)
+              </span>
+              <button
+                onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+                disabled={currentPage === totalPages}
+                className="pagination-btn"
+              >
+                Next
+              </button>
+            </div>
+          )}
+        </>
       )}
 
       {/* Create / Edit Modal Dialog */}
