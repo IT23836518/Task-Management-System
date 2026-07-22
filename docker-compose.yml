@@ -1,0 +1,47 @@
+version: '3.8'
+
+services:
+  # Database Service (PostgreSQL)
+  postgres:
+    image: postgres:15-alpine
+    container_name: task-manager-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 123
+      POSTGRES_DB: task_manager
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  # Backend Service (Express API)
+  backend:
+    build: ./backend
+    container_name: task-manager-backend
+    restart: always
+    ports:
+      - "5000:5000"
+    environment:
+      PORT: 5000
+      DATABASE_URL: "postgresql://postgres:123@postgres:5432/task_manager?schema=public"
+      JWT_SECRET: "45f9a72b21c4323c21a4f028b123d4e92a83f94857c0e812d4a5b6c7d8e9f0a1"
+      JWT_EXPIRES_IN: "1d"
+    depends_on:
+      - postgres
+
+  # Frontend Service (React + Vite served via Nginx)
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        - VITE_API_URL=http://localhost:5000/api
+    container_name: task-manager-frontend
+    restart: always
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+
+volumes:
+  pgdata:
