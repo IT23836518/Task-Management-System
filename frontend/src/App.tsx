@@ -5,7 +5,7 @@ import { DashboardStats } from './components/DashboardStats';
 import { TaskCard, type Task } from './components/TaskCard';
 import { TaskModal } from './components/TaskModal';
 import API from './services/api';
-import { Plus, Search, LogOut, CheckSquare, X, CheckCircle, AlertCircle, Info } from 'lucide-react';
+import { Plus, Search, LogOut, CheckSquare, X, CheckCircle, AlertCircle, Info, Sun, Moon } from 'lucide-react';
 import './App.css';
 
 interface Toast {
@@ -38,6 +38,21 @@ const AppContent: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalTasks, setTotalTasks] = useState(0);
+
+  // Theme State
+  const [theme, setTheme] = useState<'dark' | 'light'>(() => {
+    return (localStorage.getItem('theme') as 'dark' | 'light') || 'dark';
+  });
+
+  // Apply theme to document body
+  useEffect(() => {
+    if (theme === 'light') {
+      document.body.classList.add('light-mode');
+    } else {
+      document.body.classList.remove('light-mode');
+    }
+    localStorage.setItem('theme', theme);
+  }, [theme]);
 
   // Modal States
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -210,6 +225,14 @@ const AppContent: React.FC = () => {
             </svg>
           </div>
           <span style={{ fontSize: '18px', fontWeight: 800, color: 'var(--text-primary)', marginRight: '16px' }}>Koncepthive</span>
+          <button 
+            onClick={() => setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'))} 
+            className="theme-toggle-btn"
+            title={`Switch to ${theme === 'dark' ? 'Light' : 'Dark'} Mode`}
+            style={{ marginRight: '8px' }}
+          >
+            {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+          </button>
           <button onClick={logout} className="logout-btn" title="Log Out">
             <LogOut size={16} style={{ display: 'inline', marginRight: '6px', verticalAlign: 'middle' }} />
             <span>Sign Out</span>
